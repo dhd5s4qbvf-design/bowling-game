@@ -12,7 +12,7 @@ Dieses Projekt demonstriert eine Full-Stack-Implementierung des klassischen Bowl
 
 ---
 
-## 🛠️ Prerequisites
+## Prerequisites
 
 ### Backend Requirements
 
@@ -85,7 +85,7 @@ npm -v
 
 ---
 
-## 🚀 Schnellstart
+## Schnellstart
 
 ### Backend starten (Spring Boot)
 
