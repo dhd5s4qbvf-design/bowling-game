@@ -1,0 +1,219 @@
+.page {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 24px 16px 48px;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.header h1 {
+  font-size: 1.6rem;
+  margin: 0;
+}
+
+.reset-btn {
+  border: 1px solid #c4c9d4;
+  background: #fff;
+  border-radius: 8px;
+  padding: 10px 16px;
+  font-size: 0.95rem;
+  cursor: pointer;
+}
+
+.reset-btn:hover {
+  background: #f0f1f4;
+}
+
+.error {
+  background: #fdecea;
+  color: #b3261e;
+  border: 1px solid #f5c6c0;
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: 0.95rem;
+}
+
+.scoresheet {
+  display: flex;
+  overflow-x: auto;
+  border: 1px solid #d6d9e0;
+  border-radius: 10px;
+  background: #fff;
+}
+
+.frame {
+  min-width: 76px;
+  border-right: 1px solid #d6d9e0;
+  display: flex;
+  flex-direction: column;
+  transition: background-color 0.2s ease;
+}
+
+.frame:last-child {
+  border-right: none;
+}
+
+.frame-active {
+  background-color: #dbeafe;
+  border-left: 3px solid #3b82f6;
+  border-right: 3px solid #3b82f6;
+}
+
+.frame-active:first-child {
+  border-left: 3px solid #3b82f6;
+}
+
+.frame-placeholder {
+  opacity: 0.45;
+}
+
+.frame-placeholder.frame-active {
+  opacity: 0.7;
+  background-color: #eff6ff;
+}
+
+.frame-number {
+  text-align: center;
+  font-size: 0.75rem;
+  color: #6b7280;
+  padding: 4px 0;
+  border-bottom: 1px solid #eceef2;
+}
+
+.rolls {
+  display: flex;
+  border-bottom: 1px solid #eceef2;
+}
+
+.roll-box {
+  flex: 1;
+  text-align: center;
+  padding: 8px 0;
+  font-weight: 600;
+  font-size: 0.95rem;
+  border-right: 1px solid #eceef2;
+  min-height: 1.2em;
+}
+
+.rolls-last .roll-box:last-child {
+  border-right: none;
+}
+
+.roll-box.hidden {
+  visibility: hidden;
+}
+
+.roll-box:last-child {
+  border-right: none;
+}
+
+.frame-score {
+  text-align: center;
+  padding: 10px 0;
+  font-weight: 700;
+  font-size: 1.05rem;
+  min-height: 1.4em;
+}
+
+.total {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 20px 0;
+}
+
+.total-main {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.total-label {
+  font-size: 1rem;
+  color: #4b5563;
+}
+
+.total-value {
+  font-size: 2rem;
+  font-weight: 800;
+  color: #2563eb;
+}
+
+.game-over-badge {
+  background: #dcfce7;
+  color: #166534;
+  padding: 8px 16px;
+  border-radius: 999px;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.pins-hint {
+  color: #4b5563;
+  margin: 0 0 10px;
+}
+
+.pin-buttons {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 10px;
+}
+
+.pin-btn {
+  padding: 18px 0;
+  font-size: 1.2rem;
+  font-weight: 700;
+  border-radius: 10px;
+  border: 2px solid #e5e7eb;
+  background: #fff;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.pin-btn-active {
+  border-color: #3b82f6;
+}
+
+.pin-btn:hover:not(:disabled) {
+  background: #eff6ff;
+  border-color: #3b82f6;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.2);
+}
+
+.pin-btn:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.pin-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+  background: #f9fafb;
+}
+
+.game-complete-message {
+  color: #166534;
+  font-weight: 600;
+}
+
+.rolls-log {
+  margin-top: 20px;
+  font-size: 0.85rem;
+  color: #6b7280;
+}
+
+.rolls-log-label {
+  font-weight: 600;
+  margin-right: 6px;
+}
+
+@media (max-width: 480px) {
+  .pin-buttons {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}

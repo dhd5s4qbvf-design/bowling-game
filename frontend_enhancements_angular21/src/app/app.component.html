@@ -1,0 +1,80 @@
+<main class="page">
+  <header class="header">
+    <h1>🎳 Bowling Score Tracker</h1>
+    <button class="reset-btn" (click)="resetGame()" [disabled]="loading()">
+      {{ loading() ? 'Loading...' : 'New Game' }}
+    </button>
+  </header>
+
+  @if (errorMessage(); as error) {
+    <div class="error" role="alert">
+      <strong>Error:</strong> {{ error }}
+    </div>
+  }
+
+  @if (state(); as gameState) {
+    <section class="scoresheet">
+      @for (frame of gameState.frames; track frame.frameNumber) {
+        <div class="frame" [class.frame-active]="isCurrentFrame(frame)">
+          <div class="frame-number">{{ frame.frameNumber }}</div>
+          <div class="rolls" [class.rolls-last]="frame.frameNumber === 10">
+            @for (r of [0, 1, 2]; track $index; let i = $index) {
+              <span class="roll-box" [class.hidden]="frame.frameNumber !== 10 && i === 2">
+                {{ frameDisplay(frame, i) }}
+              </span>
+            }
+          </div>
+          <div class="frame-score">{{ frame.complete ? frame.runningTotal : '' }}</div>
+        </div>
+      }
+
+      <!-- placeholder frames not yet reached, purely visual so the sheet always shows 10 columns -->
+      @for (n of pinOptions().slice(0, 10 - gameState.frames.length); track $index; let i = $index) {
+        <div class="frame frame-placeholder" [class.frame-active]="isPlaceholderActive(i)">
+          <div class="frame-number">{{ gameState.frames.length + i + 1 }}</div>
+          <div class="rolls"><span class="roll-box"></span><span class="roll-box"></span></div>
+          <div class="frame-score"></div>
+        </div>
+      }
+    </section>
+
+    <section class="total">
+      <div class="total-main">
+        <span class="total-label">Total Score</span>
+        <span class="total-value">{{ gameState.totalScore }}</span>
+      </div>
+      @if (gameState.gameOver) {
+        <span class="game-over-badge">✓ Game Complete</span>
+      }
+    </section>
+
+    <section class="pins">
+      @if (!gameState.gameOver) {
+        <p class="pins-hint">How many pins did you knock down?</p>
+      } @else {
+        <p class="pins-hint game-complete-message">
+          Game complete! Final score: {{ gameState.totalScore }}
+        </p>
+      }
+      <div class="pin-buttons">
+        @for (p of pinOptions(); track p) {
+          <button
+            class="pin-btn"
+            [class.pin-btn-active]="!isPinDisabled(p) && !gameState.gameOver"
+            [disabled]="isPinDisabled(p)"
+            [attr.aria-label]="p + ' pins'"
+            (click)="roll(p)">
+            {{ p }}
+          </button>
+        }
+      </div>
+    </section>
+
+    @if (gameState.rolls.length > 0) {
+      <section class="rolls-log">
+        <span class="rolls-log-label">Roll History:</span>
+        <span class="rolls-log-value">{{ gameState.rolls.join(', ') }}</span>
+      </section>
+    }
+  }
+</main>
