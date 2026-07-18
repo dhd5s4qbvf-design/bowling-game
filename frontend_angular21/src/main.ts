@@ -7,7 +7,7 @@ import { AppComponent } from './app/app.component';
 bootstrapApplication(AppComponent, {
   providers: [
     provideHttpClient(
-      withFetch() // Angular 21: Use modern Fetch API instead of XHR
+      withFetch() // Angular 21:Fetch API
     )
   ],
 }).catch((err) => console.error(err));
