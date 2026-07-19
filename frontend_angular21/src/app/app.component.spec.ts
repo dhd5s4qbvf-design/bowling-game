@@ -1,75 +1,247 @@
-import { describe, it, expect, beforeEach } from 'vitest';
-import { TestBed, ComponentFixture } from '@angular/core/testing';
-import { provideHttpClient } from '@angular/common/http';
-import { provideHttpClientTesting } from '@angular/common/http/testing';
+
+import { TestBed } from '@angular/core/testing';
 import { AppComponent } from './app.component';
 import { BowlingService } from './bowling.service';
+import { FrameResult } from './models';
+import { of } from 'rxjs';
 
-describe('AppComponent (Angular 21 with Vitest)', () => {
+describe('AppComponent', () => {
   let component: AppComponent;
-  let fixture: ComponentFixture<AppComponent>;
-  let service: BowlingService;
+  let mockBowlingService: jasmine.SpyObj<BowlingService>;
 
   beforeEach(async () => {
+    mockBowlingService = jasmine.createSpyObj('BowlingService', [
+      'getState',
+      'createGame',
+      'roll',
+      'reset',
+    ]);
+
+    // Default mock response
+    mockBowlingService.getState.and.returnValue(
+      of({
+        rolls: [],
+        frames: [],
+        totalScore: 0,
+        gameOver: false,
+      })
+    );
+
     await TestBed.configureTestingModule({
       imports: [AppComponent],
-      providers: [
-        provideHttpClient(),
-        provideHttpClientTesting(),
-      ],
+      providers: [{ provide: BowlingService, useValue: mockBowlingService }],
     }).compileComponents();
 
-    fixture = TestBed.createComponent(AppComponent);
+    const fixture = TestBed.createComponent(AppComponent);
     component = fixture.componentInstance;
-    service = TestBed.inject(BowlingService);
   });
 
-  it('should create the component', () => {
-    expect(component).toBeTruthy();
-  });
+  describe('calculateMaxPins', () => {
+    // ========== No Current Frame ==========
 
-  it('should initialize with loading state', async () => {
-    expect(component.loading()).toBe(true);
-    await fixture.whenStable(); // Zoneless approach
-  });
+    it('should return 10 when no current frame exists', () => {
+      expect(component.calculateMaxPins(undefined)).toBe(10);
+    });
 
-  it('should disable buttons when loading', async () => {
-    component.loading.set(true);
-    await fixture.whenStable();
+    // ========== Frames 1-9 Tests ==========
 
-    const buttons = fixture.nativeElement.querySelectorAll('.pin-btn');
-    expect(buttons[0].disabled).toBeTruthy();
-  });
+    it('should return 10 for first roll of a regular frame', () => {
+      const frame: FrameResult = {
+        frameNumber: 5,
+        rolls: [],
+        strike: false,
+        spare: false,
+        complete: false,
+        score: null,
+        runningTotal: null,
+      };
+      expect(component.calculateMaxPins(frame)).toBe(10);
+    });
 
-  it('should calculate maxPinsForNextRoll correctly', () => {
-    component.state.set({
-      frames: [{
-        frameNumber: 1,
+    it('should return remaining pins for second roll of regular frame', () => {
+      const frame: FrameResult = {
+        frameNumber: 3,
         rolls: [7],
-        runningTotal: 0,
-        complete: false
-      }],
-      rolls: [7],
-      totalScore: 0,
-      gameOver: false
+        strike: false,
+        spare: false,
+        complete: false,
+        score: null,
+        runningTotal: null,
+      };
+      expect(component.calculateMaxPins(frame)).toBe(3); // 10 - 7
     });
 
-    expect(component.maxPinsForNextRoll()).toBe(3);
+    it('should return 10 after a strike in frames 1-9', () => {
+      const frame: FrameResult = {
+        frameNumber: 4,
+        rolls: [10],
+        strike: true,
+        spare: false,
+        complete: false,
+        score: null,
+        runningTotal: null,
+      };
+      expect(component.calculateMaxPins(frame)).toBe(10);
+    });
+
+    it('should return 10 when frame has 2 rolls (frame complete)', () => {
+      const frame: FrameResult = {
+        frameNumber: 6,
+        rolls: [5, 3],
+        strike: false,
+        spare: false,
+        complete: true,
+        score: 8,
+        runningTotal: 45,
+      };
+      expect(component.calculateMaxPins(frame)).toBe(10);
+    });
+
+    // ========== 10th Frame Tests ==========
+
+    it('should return remaining pins for 10th frame roll 2 after non-strike', () => {
+      const frame: FrameResult = {
+        frameNumber: 10,
+        rolls: [6],
+        strike: false,
+        spare: false,
+        complete: false,
+        score: null,
+        runningTotal: null,
+      };
+      expect(component.calculateMaxPins(frame)).toBe(4); // 10 - 6
+    });
+
+    it('should return 10 for 10th frame roll 2 after strike (fresh pins)', () => {
+      const frame: FrameResult = {
+        frameNumber: 10,
+        rolls: [10],
+        strike: true,
+        spare: false,
+        complete: false,
+        score: null,
+        runningTotal: null,
+      };
+      expect(component.calculateMaxPins(frame)).toBe(10);
+    });
+
+    it('should return 10 for 10th frame roll 3 after spare (fresh pins)', () => {
+      const frame: FrameResult = {
+        frameNumber: 10,
+        rolls: [7, 3],
+        strike: false,
+        spare: true,
+        complete: false,
+        score: null,
+        runningTotal: null,
+      };
+      expect(component.calculateMaxPins(frame)).toBe(10);
+    });
+
+    it('should return 10 for 10th frame roll 3 after strike+strike (fresh pins)', () => {
+      const frame: FrameResult = {
+        frameNumber: 10,
+        rolls: [10, 10],
+        strike: true,
+        spare: false,
+        complete: false,
+        score: null,
+        runningTotal: null,
+      };
+      expect(component.calculateMaxPins(frame)).toBe(10);
+    });
+
+    it('should return remaining pins for 10th frame roll 3 after strike+non-strike', () => {
+      const frame: FrameResult = {
+        frameNumber: 10,
+        rolls: [10, 7],
+        strike: true,
+        spare: false,
+        complete: false,
+        score: null,
+        runningTotal: null,
+      };
+      expect(component.calculateMaxPins(frame)).toBe(3); // 10 - 7
+    });
+
+    // ========== Edge Cases ==========
+
+    it('should handle 10th frame with 0 on first roll', () => {
+      const frame: FrameResult = {
+        frameNumber: 10,
+        rolls: [0],
+        strike: false,
+        spare: false,
+        complete: false,
+        score: null,
+        runningTotal: null,
+      };
+      expect(component.calculateMaxPins(frame)).toBe(10); // 10 - 0
+    });
+
+    it('should handle regular frame with 0 on first roll', () => {
+      const frame: FrameResult = {
+        frameNumber: 5,
+        rolls: [0],
+        strike: false,
+        spare: false,
+        complete: false,
+        score: null,
+        runningTotal: null,
+      };
+      expect(component.calculateMaxPins(frame)).toBe(10); // 10 - 0
+    });
+
+    it('should handle 10th frame roll 3 after non-strike combo (e.g., 6+3)', () => {
+      const frame: FrameResult = {
+        frameNumber: 10,
+        rolls: [6, 3], // total 9, not a spare
+        strike: false,
+        spare: false,
+        complete: false,
+        score: null,
+        runningTotal: null,
+      };
+      // No spare, no strike → should return 10 (treating as fresh pins)
+      expect(component.calculateMaxPins(frame)).toBe(10);
+    });
   });
 
-  it('should show all pins available after strike', () => {
-    component.state.set({
-      frames: [{
-        frameNumber: 1,
-        rolls: [10],
-        runningTotal: 10,
-        complete: false
-      }],
-      rolls: [10],
-      totalScore: 10,
-      gameOver: false
+  describe('isPinDisabled', () => {
+    it('should disable all pins when game is over', () => {
+      component.state.set({
+        rolls: [10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10],
+        frames: [],
+        totalScore: 300,
+        gameOver: true,
+      });
+
+      expect(component.isPinDisabled(0)).toBeTrue();
+      expect(component.isPinDisabled(5)).toBeTrue();
+      expect(component.isPinDisabled(10)).toBeTrue();
     });
 
-    expect(component.maxPinsForNextRoll()).toBe(10);
+    it('should disable pins exceeding maxPinsForNextRoll', () => {
+      component.state.set({
+        rolls: [7],
+        frames: [
+          {
+            frameNumber: 1,
+            rolls: [7],
+            strike: false,
+            spare: false,
+            complete: false,
+            score: null,
+            runningTotal: null,
+          },
+        ],
+        totalScore: 0,
+        gameOver: false,
+      });
+
+      expect(component.isPinDisabled(3)).toBeFalse(); // 3 <= max (3)
+      expect(component.isPinDisabled(4)).toBeTrue(); // 4 > max (3)
+      expect(component.isPinDisabled(10)).toBeTrue(); // 10 > max (3)
+    });
   });
 });

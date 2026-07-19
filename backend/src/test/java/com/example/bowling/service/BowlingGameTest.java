@@ -1,5 +1,6 @@
 package com.example.bowling.service;
 
+import com.example.bowling.model.FrameResult;
 import com.example.bowling.model.GameState;
 import org.junit.jupiter.api.Test;
 
@@ -284,5 +285,138 @@ class BowlingGameTest {
         BowlingGame game = new BowlingGame();
         rollMany(game, 20, 0);
         assertThrows(IllegalStateException.class, () -> game.roll(0));
+    }
+
+    // ========== 10th Frame Validation Edge Cases ==========
+
+    /**
+     * Tests that 10th frame roll 3 after strike+non-strike cannot exceed remaining pins.
+     * Example: 10th frame: X, 7, ? → max 3 pins on roll 3
+     */
+    @Test
+    void tenthFrameRoll3AfterStrikeAndNonStrikeValidation() {
+        BowlingGame game = new BowlingGame();
+        rollMany(game, 18, 0);
+        game.roll(10); // strike - gets bonus rolls
+        game.roll(7);  // second roll (fresh pins)
+        // Third roll can only be 0-3 (remaining from second roll)
+        assertThrows(IllegalArgumentException.class, () -> game.roll(4));
+    }
+
+    /**
+     * Tests that 10th frame with no spare/strike ends after exactly 2 rolls.
+     */
+    @Test
+    void tenthFrameNoSpareOrStrikeEndsAfterTwoRollsExactly() {
+        BowlingGame game = new BowlingGame();
+        rollMany(game, 18, 0);
+        game.roll(7);
+        game.roll(2); // total 9, no spare
+        assertTrue(game.isGameOver());
+        assertEquals(9, game.getState().totalScore());
+    }
+
+    /**
+     * Tests that 10th frame with spare allows exactly 3 rolls with fresh pins on roll 3.
+     */
+    @Test
+    void tenthFrameSpareAllowsFreshPinsOnRoll3() {
+        BowlingGame game = new BowlingGame();
+        rollMany(game, 18, 0);
+        game.roll(7);
+        game.roll(3);  // spare
+        game.roll(10); // fresh pins - strike is valid
+        assertTrue(game.isGameOver());
+        assertEquals(20, game.getState().totalScore()); // 7+3+10
+    }
+
+    /**
+     * Tests 10th frame: strike, strike, strike (perfect finish).
+     */
+    @Test
+    void tenthFrameThreeStrikesInARow() {
+        BowlingGame game = new BowlingGame();
+        rollMany(game, 18, 0);
+        game.roll(10); // strike
+        game.roll(10); // strike (fresh pins)
+        game.roll(10); // strike (fresh pins)
+        assertTrue(game.isGameOver());
+        assertEquals(30, game.getState().totalScore());
+    }
+
+    /**
+     * Tests 10th frame roll 2 validation: after non-strike, cannot exceed remaining.
+     */
+    @Test
+    void tenthFrameRoll2AfterNonStrikeValidation() {
+        BowlingGame game = new BowlingGame();
+        rollMany(game, 18, 0);
+        game.roll(6);
+        // Second roll cannot exceed 4 remaining pins
+        assertThrows(IllegalArgumentException.class, () -> game.roll(5));
+    }
+
+    // ========== Immutability Verification Tests ==========
+
+    /**
+     * Tests that GameState.rolls() returns an immutable list.
+     */
+    @Test
+    void gameStateRollsListIsImmutable() {
+        BowlingGame game = new BowlingGame();
+        game.roll(5);
+        GameState state = game.getState();
+
+        assertThrows(UnsupportedOperationException.class,
+            () -> state.rolls().add(10));
+    }
+
+    /**
+     * Tests that GameState.frames() returns an immutable list.
+     */
+    @Test
+    void gameStateFramesListIsImmutable() {
+        BowlingGame game = new BowlingGame();
+        game.roll(5);
+        game.roll(3);
+        GameState state = game.getState();
+
+        assertThrows(UnsupportedOperationException.class,
+            () -> state.frames().clear());
+    }
+
+    /**
+     * Tests that FrameResult.rolls() returns an immutable list.
+     */
+    @Test
+    void frameResultRollsListIsImmutable() {
+        BowlingGame game = new BowlingGame();
+        game.roll(5);
+        game.roll(3);
+        GameState state = game.getState();
+        FrameResult frame = state.frames().get(0);
+
+        assertThrows(UnsupportedOperationException.class,
+            () -> frame.rolls().add(10));
+    }
+
+    /**
+     * Tests that modifying returned GameState doesn't affect internal game state.
+     */
+    @Test
+    void gameStateIsDefensivelyCopied() {
+        BowlingGame game = new BowlingGame();
+        game.roll(5);
+        GameState state1 = game.getState();
+
+        game.roll(3);
+        GameState state2 = game.getState();
+
+        // state1 should still show only 1 roll
+        assertEquals(1, state1.rolls().size());
+        assertEquals(5, state1.rolls().get(0));
+
+        // state2 should show 2 rolls
+        assertEquals(2, state2.rolls().size());
     }
 }
