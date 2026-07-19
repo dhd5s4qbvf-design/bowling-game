@@ -36,35 +36,88 @@ export class AppComponent {
     return last.complete ? undefined : last;
   });
 
-  readonly maxPinsForNextRoll = computed(() => {
-    const current = this.currentFrame();
-    if (!current) return 10;
-
-    if (current.frameNumber < 10) {
-      // If first roll was a strike, frame is done - all pins available
-      if (current.rolls[0] === 10) return 10;
-      // If we already have 2 rolls in frames 1-9, frame is complete - all pins available
-      if (current.rolls.length >= 2) return 10;
-      // Second roll of frame - can't exceed remaining pins
-      return 10 - current.rolls[0];
-    }
-
-    // 10th frame
-    if (current.rolls.length === 1) {
-      return current.rolls[0] === 10 ? 10 : 10 - current.rolls[0];
-    }
-    if (current.rolls.length === 2) {
-      const firstIsStrike = current.rolls[0] === 10;
-      if (firstIsStrike) {
-        return current.rolls[1] === 10 ? 10 : 10 - current.rolls[1];
-      }
-      return 10; // spare -> fresh set of pins for the bonus roll
-    }
-    return 10;
-  });
+  readonly maxPinsForNextRoll = computed(() =>
+    this.calculateMaxPins(this.currentFrame())
+  );
 
   constructor() {
     this.initializeGame();
+  }
+
+  /**
+   * Calculates the maximum number of pins available for the next roll.
+   * Extracted for testability and reusability.
+   *
+   * Rules:
+   * - No current frame: 10 pins (fresh frame)
+   * - Frames 1-9: First roll = 10 remaining, second roll = 10 - first roll
+   * - Frame 10, roll 1: 10 remaining if strike, else 10 - first roll
+   * - Frame 10, roll 2 after strike: 10 if previous was strike, else 10 - previous
+   * - Frame 10, roll 3 after spare: 10 (fresh pins)
+   *
+   * @param currentFrame The incomplete frame, or undefined if no frame is in progress
+   * @returns Maximum pins available (0-10)
+   */
+  calculateMaxPins(currentFrame: FrameResult | undefined): number {
+    if (!currentFrame) {
+      return 10; // Starting fresh frame
+    }
+
+    // Frames 1-9
+    if (currentFrame.frameNumber < 10) {
+      return this.calculateMaxPinsRegularFrame(currentFrame);
+    }
+
+    // Frame 10 (special rules)
+    return this.calculateMaxPinsTenthFrame(currentFrame);
+  }
+
+  /**
+   * Calculates max pins for frames 1-9.
+   * - Strike (1 roll): Next roll is a new frame → 10 pins
+   * - Two rolls already: Frame complete → 10 pins
+   * - Second roll: 10 - first roll
+   */
+  private calculateMaxPinsRegularFrame(frame: FrameResult): number {
+    // Strike or frame complete - next roll is for new frame
+    if (frame.rolls[0] === 10 || frame.rolls.length >= 2) {
+      return 10;
+    }
+    // Second roll - can't exceed remaining pins
+    return 10 - frame.rolls[0];
+  }
+
+  /**
+   * Calculates max pins for frame 10 (has bonus rolls).
+   * - Roll 1: 10 remaining
+   * - Roll 2: If roll 1 was strike → fresh pins (10), else → 10 - roll 1
+   * - Roll 3 after strike: If roll 2 was strike → 10, else → 10 - roll 2
+   * - Roll 3 after spare: Fresh pins → 10
+   */
+  private calculateMaxPinsTenthFrame(frame: FrameResult): number {
+    const rollCount = frame.rolls.length;
+
+    // Roll 2
+    if (rollCount === 1) {
+      return frame.rolls[0] === 10 ? 10 : 10 - frame.rolls[0];
+    }
+
+    // Roll 3
+    if (rollCount === 2) {
+      const firstIsStrike = frame.rolls[0] === 10;
+
+      if (firstIsStrike) {
+        // After strike on roll 1, roll 2 gets fresh pins
+        // Roll 3 depends on roll 2
+        return frame.rolls[1] === 10 ? 10 : 10 - frame.rolls[1];
+      }
+
+      // No strike on roll 1 - either spare or regular
+      // After spare (roll 1 + roll 2 = 10), roll 3 gets fresh pins
+      return 10;
+    }
+
+    return 10;
   }
 
   /**

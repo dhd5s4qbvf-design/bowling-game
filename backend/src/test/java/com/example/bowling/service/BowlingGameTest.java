@@ -26,7 +26,7 @@ class BowlingGameTest {
     void allGutterBallsScoreZero() {
         BowlingGame game = new BowlingGame();
         rollMany(game, 20, 0);
-        assertEquals(0, game.getState().getTotalScore());
+        assertEquals(0, game.getState().totalScore());
         assertTrue(game.isGameOver());
     }
 
@@ -37,7 +37,7 @@ class BowlingGameTest {
     void allOnesScoreTwenty() {
         BowlingGame game = new BowlingGame();
         rollMany(game, 20, 1);
-        assertEquals(20, game.getState().getTotalScore());
+        assertEquals(20, game.getState().totalScore());
     }
 
     // ========== Spare Tests ==========
@@ -53,7 +53,7 @@ class BowlingGameTest {
         game.roll(5); // spare
         game.roll(3);
         rollMany(game, 17, 0);
-        assertEquals(16, game.getState().getTotalScore());
+        assertEquals(16, game.getState().totalScore());
     }
 
     /**
@@ -65,7 +65,7 @@ class BowlingGameTest {
         BowlingGame game = new BowlingGame();
         rollMany(game, 20, 5);
         game.roll(5); // extra bonus roll for the 10th frame spare
-        assertEquals(150, game.getState().getTotalScore());
+        assertEquals(150, game.getState().totalScore());
         assertTrue(game.isGameOver());
     }
 
@@ -78,11 +78,11 @@ class BowlingGameTest {
         game.roll(4);
         game.roll(6); // spare, but no bonus yet
         GameState state = game.getState();
-        assertEquals(1, state.getFrames().size());
-        assertTrue(state.getFrames().get(0).isSpare());
-        assertFalse(state.getFrames().get(0).isComplete());
-        assertNull(state.getFrames().get(0).getScore());
-        assertEquals(0, state.getTotalScore());
+        assertEquals(1, state.frames().size());
+        assertTrue(state.frames().get(0).spare());
+        assertFalse(state.frames().get(0).complete());
+        assertNull(state.frames().get(0).score());
+        assertEquals(0, state.totalScore());
     }
 
     // ========== Strike Tests ==========
@@ -98,7 +98,7 @@ class BowlingGameTest {
         game.roll(3);
         game.roll(4);
         rollMany(game, 16, 0);
-        assertEquals(24, game.getState().getTotalScore());
+        assertEquals(24, game.getState().totalScore());
     }
 
     /**
@@ -108,7 +108,7 @@ class BowlingGameTest {
     void perfectGameScoresThreeHundred() {
         BowlingGame game = new BowlingGame();
         rollMany(game, 12, 10);
-        assertEquals(300, game.getState().getTotalScore());
+        assertEquals(300, game.getState().totalScore());
         assertTrue(game.isGameOver());
     }
 
@@ -125,7 +125,7 @@ class BowlingGameTest {
         game.roll(5);
         game.roll(3);
         rollMany(game, 12, 0);
-        assertEquals(81, game.getState().getTotalScore());
+        assertEquals(81, game.getState().totalScore());
     }
 
     /**
@@ -140,7 +140,7 @@ class BowlingGameTest {
             game.roll(0);  // next frame starts with gutter
             game.roll(0);
         }
-        assertEquals(50, game.getState().getTotalScore());
+        assertEquals(50, game.getState().totalScore());
         assertTrue(game.isGameOver());
     }
 
@@ -152,9 +152,9 @@ class BowlingGameTest {
         BowlingGame game = new BowlingGame();
         game.roll(10); // strike, bonus not known yet
         GameState state = game.getState();
-        assertFalse(state.getFrames().get(0).isComplete());
-        assertNull(state.getFrames().get(0).getScore());
-        assertFalse(state.isGameOver());
+        assertFalse(state.frames().get(0).complete());
+        assertNull(state.frames().get(0).score());
+        assertFalse(state.gameOver());
     }
 
     // ========== Mixed Game Tests ==========
@@ -172,7 +172,7 @@ class BowlingGameTest {
         game.roll(9);  // frame 4: 9
         game.roll(0);
         rollMany(game, 12, 0);
-        assertEquals(68, game.getState().getTotalScore());
+        assertEquals(68, game.getState().totalScore());
     }
 
     // ========== 10th Frame Tests ==========
@@ -187,7 +187,7 @@ class BowlingGameTest {
         game.roll(3);
         game.roll(5); // no spare/strike, game should be over
         assertTrue(game.isGameOver());
-        assertEquals(8, game.getState().getTotalScore());
+        assertEquals(8, game.getState().totalScore());
     }
 
     /**
@@ -200,7 +200,7 @@ class BowlingGameTest {
         game.roll(10); // strike
         game.roll(7);  // second roll
         game.roll(3);  // spare on second+third
-        assertEquals(20, game.getState().getTotalScore());
+        assertEquals(20, game.getState().totalScore());
         assertTrue(game.isGameOver());
     }
 
@@ -214,7 +214,7 @@ class BowlingGameTest {
         game.roll(10); // strike
         game.roll(3);
         game.roll(4);
-        assertEquals(17, game.getState().getTotalScore());
+        assertEquals(17, game.getState().totalScore());
         assertTrue(game.isGameOver());
     }
 
@@ -234,7 +234,7 @@ class BowlingGameTest {
         game.roll(10);
         // 9th frame: 10 + 10 = 20
         // 10th frame: 10 + 10 + 10 = 30
-        assertEquals(50, game.getState().getTotalScore());
+        assertEquals(50, game.getState().totalScore());
         assertTrue(game.isGameOver());
     }
 
@@ -250,7 +250,7 @@ class BowlingGameTest {
         game.roll(3);
         // 9th frame: 10 + 5 + 3 = 18
         // 10th frame: 5 + 3 = 8
-        assertEquals(26, game.getState().getTotalScore());
+        assertEquals(26, game.getState().totalScore());
         assertTrue(game.isGameOver());
     }
 
