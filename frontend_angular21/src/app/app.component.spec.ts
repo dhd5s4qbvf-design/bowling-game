@@ -1,5 +1,6 @@
 
 import { TestBed } from '@angular/core/testing';
+import { vi } from 'vitest';
 import { AppComponent } from './app.component';
 import { BowlingService } from './bowling.service';
 import { FrameResult } from './models';
@@ -7,18 +8,23 @@ import { of } from 'rxjs';
 
 describe('AppComponent', () => {
   let component: AppComponent;
-  let mockBowlingService: jasmine.SpyObj<BowlingService>;
+  let mockBowlingService: {
+    getState: ReturnType<typeof vi.fn>;
+    createGame: ReturnType<typeof vi.fn>;
+    roll: ReturnType<typeof vi.fn>;
+    reset: ReturnType<typeof vi.fn>;
+  };
 
   beforeEach(async () => {
-    mockBowlingService = jasmine.createSpyObj('BowlingService', [
-      'getState',
-      'createGame',
-      'roll',
-      'reset',
-    ]);
+    mockBowlingService = {
+      getState: vi.fn(),
+      createGame: vi.fn(),
+      roll: vi.fn(),
+      reset: vi.fn(),
+    };
 
     // Default mock response
-    mockBowlingService.getState.and.returnValue(
+    mockBowlingService.getState.mockReturnValue(
       of({
         rolls: [],
         frames: [],
@@ -216,9 +222,9 @@ describe('AppComponent', () => {
         gameOver: true,
       });
 
-      expect(component.isPinDisabled(0)).toBeTrue();
-      expect(component.isPinDisabled(5)).toBeTrue();
-      expect(component.isPinDisabled(10)).toBeTrue();
+      expect(component.isPinDisabled(0)).toBe(true);
+      expect(component.isPinDisabled(5)).toBe(true);
+      expect(component.isPinDisabled(10)).toBe(true);
     });
 
     it('should disable pins exceeding maxPinsForNextRoll', () => {
@@ -239,9 +245,9 @@ describe('AppComponent', () => {
         gameOver: false,
       });
 
-      expect(component.isPinDisabled(3)).toBeFalse(); // 3 <= max (3)
-      expect(component.isPinDisabled(4)).toBeTrue(); // 4 > max (3)
-      expect(component.isPinDisabled(10)).toBeTrue(); // 10 > max (3)
+      expect(component.isPinDisabled(3)).toBe(false); // 3 <= max (3)
+      expect(component.isPinDisabled(4)).toBe(true); // 4 > max (3)
+      expect(component.isPinDisabled(10)).toBe(true); // 10 > max (3)
     });
   });
 });

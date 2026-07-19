@@ -49,9 +49,7 @@
         "test": {
           "builder": "@angular/build:unit-test",
           "options": {
-            "coverage": true,
-            "ui": true,
-            "browsers": ["chromium"]
+            "buildTarget": "bowling-frontend-angular21:build:development"
           }
         }
       }

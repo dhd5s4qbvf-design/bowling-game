@@ -79,8 +79,8 @@ export class AppComponent {
    * - Second roll: 10 - first roll
    */
   private calculateMaxPinsRegularFrame(frame: FrameResult): number {
-    // Strike or frame complete - next roll is for new frame
-    if (frame.rolls[0] === 10 || frame.rolls.length >= 2) {
+    // No rolls yet, strike, or frame complete - next roll is for a fresh frame
+    if (frame.rolls.length === 0 || frame.rolls[0] === 10 || frame.rolls.length >= 2) {
       return 10;
     }
     // Second roll - can't exceed remaining pins
