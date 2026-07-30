@@ -25,8 +25,11 @@ public class BowlingGame {
      */
     public void roll(int pins) {
         validatePinCount(pins);
-        validateGameNotOver();
-        validateFrameConstraints(pins);
+
+        List<FrameResult> frames = calculateFrames(rolls);
+        validateGameNotOver(frames);
+        validateFrameConstraints(frames, pins);
+
         rolls.add(pins);
     }
 
@@ -40,11 +43,100 @@ public class BowlingGame {
                 .filter(FrameResult::complete)
                 .mapToInt(FrameResult::score)
                 .sum();
-        return new GameState(new ArrayList<>(rolls), frames, total, isGameOver());
+        boolean gameOver = isGameOver(frames);
+        return new GameState(new ArrayList<>(rolls), frames, total, gameOver,
+                computeMaxPinsForNextRoll(frames, gameOver));
+    }
+
+    /**
+     * Returns the maximum pin count that would be accepted for the next roll,
+     * given standard ten-pin frame constraints. Used both to validate incoming
+     * rolls and to let clients render legal inputs without re-implementing
+     * these rules themselves.
+     */
+    public int getMaxPinsForNextRoll() {
+        List<FrameResult> frames = calculateFrames(rolls);
+        return computeMaxPinsForNextRoll(frames, isGameOver(frames));
+    }
+
+    private int computeMaxPinsForNextRoll(List<FrameResult> frames, boolean gameOver) {
+        if (gameOver) {
+            return 0;
+        }
+
+        if (frames.isEmpty() || frames.get(frames.size() - 1).complete()) {
+            return MAX_PINS; // First roll or starting a fresh frame
+        }
+
+        FrameResult currentFrame = frames.get(frames.size() - 1);
+        List<Integer> frameRolls = currentFrame.rolls();
+
+        return currentFrame.frameNumber() < FRAME_COUNT
+                ? maxPinsRegularFrame(frameRolls)
+                : maxPinsTenthFrame(frameRolls);
+    }
+
+    private int maxPinsRegularFrame(List<Integer> frameRolls) {
+        // First roll, strike, or spare awaiting its bonus roll - full rack available
+        if (frameRolls.isEmpty() || frameRolls.size() >= 2 || frameRolls.get(0) == MAX_PINS) {
+            return MAX_PINS;
+        }
+        // Second roll - limited to what's left standing
+        return clampToRack(MAX_PINS - frameRolls.get(0));
+    }
+
+    /**
+     * Computes the max legal pins for the 10th frame given its rolls so far.
+     * Self-contained: correct for any frameRolls it's handed, not just the
+     * ones the current caller happens to pass (an already-open/complete frame
+     * or a fully-rolled one both correctly yield 0, no third roll is legal).
+     * Package-private so this invariant can be unit tested directly, since
+     * the public API (getMaxPinsForNextRoll/getState) never hands it such
+     * input - isGameOver() already returns 0 before reaching it.
+     */
+    int maxPinsTenthFrame(List<Integer> frameRolls) {
+        if (frameRolls.isEmpty()) {
+            return MAX_PINS;
+        }
+
+        if (frameRolls.size() == 1) {
+            int first = frameRolls.get(0);
+            return first == MAX_PINS ? MAX_PINS : clampToRack(MAX_PINS - first);
+        }
+
+        if (frameRolls.size() >= 3) {
+            return 0; // all three rolls already made - nothing more is legal
+        }
+
+        int first = frameRolls.get(0);
+        int second = frameRolls.get(1);
+        boolean strike = first == MAX_PINS;
+        boolean twoStrikes = strike && second == MAX_PINS;
+        boolean spare = !strike && first + second == MAX_PINS;
+
+        if (twoStrikes || spare) {
+            return MAX_PINS; // fresh pins for roll 3
+        }
+        if (strike) {
+            return clampToRack(MAX_PINS - second); // strike then non-strike: limited by roll 2
+        }
+        return 0; // open frame (no strike/spare) is already complete - no roll 3 legal
+    }
+
+    /**
+     * Keeps a pin-count calculation within the legal 0-10 range. Every reachable
+     * branch above already stays in range; this exists so the function is
+     * obviously total rather than relying on that being proven by inspection.
+     */
+    private int clampToRack(int pins) {
+        return Math.max(0, Math.min(MAX_PINS, pins));
     }
 
     public boolean isGameOver() {
-        List<FrameResult> frames = calculateFrames(rolls);
+        return isGameOver(calculateFrames(rolls));
+    }
+
+    private boolean isGameOver(List<FrameResult> frames) {
         return frames.size() == FRAME_COUNT && frames.get(FRAME_COUNT - 1).complete();
     }
 
@@ -55,110 +147,22 @@ public class BowlingGame {
         }
     }
 
-    private void validateGameNotOver() {
-        if (isGameOver()) {
+    private void validateGameNotOver(List<FrameResult> frames) {
+        if (isGameOver(frames)) {
             throw new IllegalStateException("Cannot roll: game is already complete.");
         }
     }
 
-    private void validateFrameConstraints(int pins) {
-        List<FrameResult> frames = calculateFrames(rolls);
-        if (frames.isEmpty() || frames.get(frames.size() - 1).complete()) {
-            return; // First roll or starting new frame
-        }
-
-        FrameResult currentFrame = frames.get(frames.size() - 1);
-        List<Integer> frameRolls = currentFrame.rolls();
-
-        if (currentFrame.frameNumber() < FRAME_COUNT) {
-            validateRegularFrame(frameRolls, pins);
-        } else {
-            validateTenthFrame(frameRolls, pins);
-        }
-    }
-
-    /**
-     * Validates pin count for frames 1-9.
-     * Rule: Second roll in a frame cannot exceed remaining pins (unless first roll was a strike).
-     */
-    private void validateRegularFrame(List<Integer> frameRolls, int pins) {
-        // First roll or strike - no validation needed
-        if (frameRolls.isEmpty() || frameRolls.size() >= 2 || frameRolls.get(0) == MAX_PINS) {
-            return;
-        }
-
-        // Second roll validation
-        int firstRoll = frameRolls.get(0);
-        int remainingPins = MAX_PINS - firstRoll;
-
-        if (pins > remainingPins) {
+    private void validateFrameConstraints(List<FrameResult> frames, int pins) {
+        // isGameOver(frames) is re-derived rather than assumed false: this
+        // method must stay correct even if called independently of
+        // validateGameNotOver(frames), not just when roll() happens to call
+        // them in sequence.
+        int maxPins = computeMaxPinsForNextRoll(frames, isGameOver(frames));
+        if (pins > maxPins) {
             throw new IllegalArgumentException(
-                    String.format("Invalid roll: %d pins exceeds %d remaining pins in frame.",
-                            pins, remainingPins));
-        }
-    }
-
-    /**
-     * Validates pin count for 10th frame.
-     * Rules:
-     * - Roll 1: Any value 0-10
-     * - Roll 2: If roll 1 was strike, fresh pins (0-10). Otherwise, cannot exceed remaining.
-     * - Roll 3: If roll 1 was strike and roll 2 was not, cannot exceed remaining from roll 2.
-     *           If roll 1+2 was spare, fresh pins (0-10).
-     */
-    private void validateTenthFrame(List<Integer> frameRolls, int pins) {
-        int rollCount = frameRolls.size();
-
-        // Roll 2 validation
-        if (rollCount == 1) {
-            validateTenthFrameRoll2(frameRolls.get(0), pins);
-            return;
-        }
-
-        // Roll 3 validation
-        if (rollCount == 2) {
-            validateTenthFrameRoll3(frameRolls.get(0), frameRolls.get(1), pins);
-        }
-    }
-
-    private void validateTenthFrameRoll2(int firstRoll, int pins) {
-        // After a strike, pins are reset - any value 0-10 is valid
-        if (firstRoll == MAX_PINS) {
-            return;
-        }
-
-        // No strike - must not exceed remaining pins
-        int remainingPins = MAX_PINS - firstRoll;
-        if (pins > remainingPins) {
-            throw new IllegalArgumentException(
-                    String.format("Invalid 10th frame roll 2: %d pins exceeds %d remaining pins.",
-                            pins, remainingPins));
-        }
-    }
-
-    private void validateTenthFrameRoll3(int firstRoll, int secondRoll, int pins) {
-        boolean firstWasStrike = firstRoll == MAX_PINS;
-        boolean secondWasStrike = secondRoll == MAX_PINS;
-        boolean wasSpare = firstRoll + secondRoll == MAX_PINS;
-
-        // After a spare, pins are reset - any value 0-10 is valid
-        if (wasSpare) {
-            return;
-        }
-
-        // After strike + strike, pins were reset for roll 3 - any value valid
-        if (firstWasStrike && secondWasStrike) {
-            return;
-        }
-
-        // After strike + non-strike, roll 3 cannot exceed remaining from roll 2
-        if (firstWasStrike && !secondWasStrike) {
-            int remainingPins = MAX_PINS - secondRoll;
-            if (pins > remainingPins) {
-                throw new IllegalArgumentException(
-                        String.format("Invalid 10th frame roll 3: %d pins exceeds %d remaining pins.",
-                                pins, remainingPins));
-            }
+                    String.format("Invalid roll: %d pins exceeds %d pins available for this roll.",
+                            pins, maxPins));
         }
     }
 
@@ -177,9 +181,9 @@ public class BowlingGame {
 
             FrameResultData data;
             if (frameNumber < FRAME_COUNT) {
-                data = processRegularFrame(allRolls, rollIndex, frameNumber);
+                data = processRegularFrame(allRolls, rollIndex);
             } else {
-                data = processTenthFrame(allRolls, rollIndex, frameNumber);
+                data = processTenthFrame(allRolls, rollIndex);
             }
 
             // Update running total if frame is complete
@@ -219,7 +223,7 @@ public class BowlingGame {
         int nextRollIndex
     ) {}
 
-    private FrameResultData processRegularFrame(List<Integer> allRolls, int rollIndex, int frameNumber) {
+    private FrameResultData processRegularFrame(List<Integer> allRolls, int rollIndex) {
         int firstRoll = allRolls.get(rollIndex);
         List<Integer> rolls = new ArrayList<>();
         boolean strike = false;
@@ -266,7 +270,7 @@ public class BowlingGame {
         return new FrameResultData(rolls, strike, spare, complete, score, nextRollIndex);
     }
 
-    private FrameResultData processTenthFrame(List<Integer> allRolls, int rollIndex, int frameNumber) {
+    private FrameResultData processTenthFrame(List<Integer> allRolls, int rollIndex) {
         // 10th frame: consume all remaining rolls (max 3)
         List<Integer> remaining = allRolls.subList(rollIndex, allRolls.size());
         List<Integer> rolls = new ArrayList<>(remaining);

@@ -1,253 +1,70 @@
-
 import { TestBed } from '@angular/core/testing';
+import { signal } from '@angular/core';
 import { vi } from 'vitest';
 import { AppComponent } from './app.component';
-import { BowlingService } from './bowling.service';
-import { FrameResult } from './models';
-import { of } from 'rxjs';
+import { BowlingStoreService } from './bowling/services/bowling-store.service';
+import { GameState } from './bowling/models/bowling.models';
 
 describe('AppComponent', () => {
-  let component: AppComponent;
-  let mockBowlingService: {
-    getState: ReturnType<typeof vi.fn>;
-    createGame: ReturnType<typeof vi.fn>;
+  let mockStore: {
+    state: ReturnType<typeof signal<GameState | null>>;
+    loading: ReturnType<typeof signal<boolean>>;
+    errorMessage: ReturnType<typeof signal<string | null>>;
+    load: ReturnType<typeof vi.fn>;
     roll: ReturnType<typeof vi.fn>;
     reset: ReturnType<typeof vi.fn>;
   };
 
   beforeEach(async () => {
-    mockBowlingService = {
-      getState: vi.fn(),
-      createGame: vi.fn(),
+    mockStore = {
+      state: signal<GameState | null>(null),
+      loading: signal(false),
+      errorMessage: signal<string | null>(null),
+      load: vi.fn(),
       roll: vi.fn(),
       reset: vi.fn(),
     };
 
-    // Default mock response
-    mockBowlingService.getState.mockReturnValue(
-      of({
-        rolls: [],
-        frames: [],
-        totalScore: 0,
-        gameOver: false,
-      })
-    );
-
     await TestBed.configureTestingModule({
       imports: [AppComponent],
-      providers: [{ provide: BowlingService, useValue: mockBowlingService }],
+      providers: [{ provide: BowlingStoreService, useValue: mockStore }],
     }).compileComponents();
+  });
 
+  function createComponent() {
     const fixture = TestBed.createComponent(AppComponent);
-    component = fixture.componentInstance;
+    fixture.detectChanges();
+    return fixture.componentInstance;
+  }
+
+  it('loads the game on construction', () => {
+    createComponent();
+    expect(mockStore.load).toHaveBeenCalledTimes(1);
   });
 
-  describe('calculateMaxPins', () => {
-    // ========== No Current Frame ==========
-
-    it('should return 10 when no current frame exists', () => {
-      expect(component.calculateMaxPins(undefined)).toBe(10);
-    });
-
-    // ========== Frames 1-9 Tests ==========
-
-    it('should return 10 for first roll of a regular frame', () => {
-      const frame: FrameResult = {
-        frameNumber: 5,
-        rolls: [],
-        strike: false,
-        spare: false,
-        complete: false,
-        score: null,
-        runningTotal: null,
-      };
-      expect(component.calculateMaxPins(frame)).toBe(10);
-    });
-
-    it('should return remaining pins for second roll of regular frame', () => {
-      const frame: FrameResult = {
-        frameNumber: 3,
-        rolls: [7],
-        strike: false,
-        spare: false,
-        complete: false,
-        score: null,
-        runningTotal: null,
-      };
-      expect(component.calculateMaxPins(frame)).toBe(3); // 10 - 7
-    });
-
-    it('should return 10 after a strike in frames 1-9', () => {
-      const frame: FrameResult = {
-        frameNumber: 4,
-        rolls: [10],
-        strike: true,
-        spare: false,
-        complete: false,
-        score: null,
-        runningTotal: null,
-      };
-      expect(component.calculateMaxPins(frame)).toBe(10);
-    });
-
-    it('should return 10 when frame has 2 rolls (frame complete)', () => {
-      const frame: FrameResult = {
-        frameNumber: 6,
-        rolls: [5, 3],
-        strike: false,
-        spare: false,
-        complete: true,
-        score: 8,
-        runningTotal: 45,
-      };
-      expect(component.calculateMaxPins(frame)).toBe(10);
-    });
-
-    // ========== 10th Frame Tests ==========
-
-    it('should return remaining pins for 10th frame roll 2 after non-strike', () => {
-      const frame: FrameResult = {
-        frameNumber: 10,
-        rolls: [6],
-        strike: false,
-        spare: false,
-        complete: false,
-        score: null,
-        runningTotal: null,
-      };
-      expect(component.calculateMaxPins(frame)).toBe(4); // 10 - 6
-    });
-
-    it('should return 10 for 10th frame roll 2 after strike (fresh pins)', () => {
-      const frame: FrameResult = {
-        frameNumber: 10,
-        rolls: [10],
-        strike: true,
-        spare: false,
-        complete: false,
-        score: null,
-        runningTotal: null,
-      };
-      expect(component.calculateMaxPins(frame)).toBe(10);
-    });
-
-    it('should return 10 for 10th frame roll 3 after spare (fresh pins)', () => {
-      const frame: FrameResult = {
-        frameNumber: 10,
-        rolls: [7, 3],
-        strike: false,
-        spare: true,
-        complete: false,
-        score: null,
-        runningTotal: null,
-      };
-      expect(component.calculateMaxPins(frame)).toBe(10);
-    });
-
-    it('should return 10 for 10th frame roll 3 after strike+strike (fresh pins)', () => {
-      const frame: FrameResult = {
-        frameNumber: 10,
-        rolls: [10, 10],
-        strike: true,
-        spare: false,
-        complete: false,
-        score: null,
-        runningTotal: null,
-      };
-      expect(component.calculateMaxPins(frame)).toBe(10);
-    });
-
-    it('should return remaining pins for 10th frame roll 3 after strike+non-strike', () => {
-      const frame: FrameResult = {
-        frameNumber: 10,
-        rolls: [10, 7],
-        strike: true,
-        spare: false,
-        complete: false,
-        score: null,
-        runningTotal: null,
-      };
-      expect(component.calculateMaxPins(frame)).toBe(3); // 10 - 7
-    });
-
-    // ========== Edge Cases ==========
-
-    it('should handle 10th frame with 0 on first roll', () => {
-      const frame: FrameResult = {
-        frameNumber: 10,
-        rolls: [0],
-        strike: false,
-        spare: false,
-        complete: false,
-        score: null,
-        runningTotal: null,
-      };
-      expect(component.calculateMaxPins(frame)).toBe(10); // 10 - 0
-    });
-
-    it('should handle regular frame with 0 on first roll', () => {
-      const frame: FrameResult = {
-        frameNumber: 5,
-        rolls: [0],
-        strike: false,
-        spare: false,
-        complete: false,
-        score: null,
-        runningTotal: null,
-      };
-      expect(component.calculateMaxPins(frame)).toBe(10); // 10 - 0
-    });
-
-    it('should handle 10th frame roll 3 after non-strike combo (e.g., 6+3)', () => {
-      const frame: FrameResult = {
-        frameNumber: 10,
-        rolls: [6, 3], // total 9, not a spare
-        strike: false,
-        spare: false,
-        complete: false,
-        score: null,
-        runningTotal: null,
-      };
-      // No spare, no strike → should return 10 (treating as fresh pins)
-      expect(component.calculateMaxPins(frame)).toBe(10);
-    });
+  it('delegates roll() to the store', () => {
+    const component = createComponent();
+    component.roll(7);
+    expect(mockStore.roll).toHaveBeenCalledWith(7);
   });
 
-  describe('isPinDisabled', () => {
-    it('should disable all pins when game is over', () => {
-      component.state.set({
-        rolls: [10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10],
-        frames: [],
-        totalScore: 300,
-        gameOver: true,
-      });
+  describe('resetGame', () => {
+    it('resets via the store when the user confirms', () => {
+      vi.spyOn(window, 'confirm').mockReturnValue(true);
+      const component = createComponent();
 
-      expect(component.isPinDisabled(0)).toBe(true);
-      expect(component.isPinDisabled(5)).toBe(true);
-      expect(component.isPinDisabled(10)).toBe(true);
+      component.resetGame();
+
+      expect(mockStore.reset).toHaveBeenCalledTimes(1);
     });
 
-    it('should disable pins exceeding maxPinsForNextRoll', () => {
-      component.state.set({
-        rolls: [7],
-        frames: [
-          {
-            frameNumber: 1,
-            rolls: [7],
-            strike: false,
-            spare: false,
-            complete: false,
-            score: null,
-            runningTotal: null,
-          },
-        ],
-        totalScore: 0,
-        gameOver: false,
-      });
+    it('does nothing when the user cancels the confirmation', () => {
+      vi.spyOn(window, 'confirm').mockReturnValue(false);
+      const component = createComponent();
 
-      expect(component.isPinDisabled(3)).toBe(false); // 3 <= max (3)
-      expect(component.isPinDisabled(4)).toBe(true); // 4 > max (3)
-      expect(component.isPinDisabled(10)).toBe(true); // 10 > max (3)
+      component.resetGame();
+
+      expect(mockStore.reset).not.toHaveBeenCalled();
     });
   });
 });

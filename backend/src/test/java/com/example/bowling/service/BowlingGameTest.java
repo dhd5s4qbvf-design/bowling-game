@@ -4,6 +4,8 @@ import com.example.bowling.model.FrameResult;
 import com.example.bowling.model.GameState;
 import org.junit.jupiter.api.Test;
 
+import java.util.List;
+
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
@@ -418,5 +420,171 @@ class BowlingGameTest {
 
         // state2 should show 2 rolls
         assertEquals(2, state2.rolls().size());
+    }
+
+    // ========== getMaxPinsForNextRoll Tests ==========
+
+    @Test
+    void maxPinsIsTenAtGameStart() {
+        BowlingGame game = new BowlingGame();
+        assertEquals(10, game.getMaxPinsForNextRoll());
+    }
+
+    @Test
+    void maxPinsIsRemainingPinsOnSecondRollOfRegularFrame() {
+        BowlingGame game = new BowlingGame();
+        game.roll(4);
+        assertEquals(6, game.getMaxPinsForNextRoll());
+    }
+
+    @Test
+    void maxPinsIsTenForFreshFrameAfterStrike() {
+        BowlingGame game = new BowlingGame();
+        game.roll(10);
+        assertEquals(10, game.getMaxPinsForNextRoll());
+    }
+
+    @Test
+    void maxPinsIsTenForFreshFrameAfterSpareEvenBeforeBonusIsScored() {
+        BowlingGame game = new BowlingGame();
+        game.roll(6);
+        game.roll(4); // spare, frame 1 still unscored (needs bonus roll)
+        assertEquals(10, game.getMaxPinsForNextRoll());
+    }
+
+    @Test
+    void maxPinsIsTenOnFirstRollOfTenthFrame() {
+        BowlingGame game = new BowlingGame();
+        rollMany(game, 18, 0);
+        assertEquals(10, game.getMaxPinsForNextRoll());
+    }
+
+    @Test
+    void maxPinsIsRemainingPinsOnTenthFrameRoll2AfterNonStrike() {
+        BowlingGame game = new BowlingGame();
+        rollMany(game, 18, 0);
+        game.roll(6);
+        assertEquals(4, game.getMaxPinsForNextRoll());
+    }
+
+    @Test
+    void maxPinsIsTenOnTenthFrameRoll2AfterStrike() {
+        BowlingGame game = new BowlingGame();
+        rollMany(game, 18, 0);
+        game.roll(10);
+        assertEquals(10, game.getMaxPinsForNextRoll());
+    }
+
+    @Test
+    void maxPinsIsTenOnTenthFrameRoll3AfterTwoStrikes() {
+        BowlingGame game = new BowlingGame();
+        rollMany(game, 18, 0);
+        game.roll(10);
+        game.roll(10);
+        assertEquals(10, game.getMaxPinsForNextRoll());
+    }
+
+    @Test
+    void maxPinsIsRemainingPinsOnTenthFrameRoll3AfterStrikeThenNonStrike() {
+        BowlingGame game = new BowlingGame();
+        rollMany(game, 18, 0);
+        game.roll(10);
+        game.roll(3);
+        assertEquals(7, game.getMaxPinsForNextRoll());
+    }
+
+    /**
+     * Edge case: a strike followed by a gutter ball (0) on roll 2 coincidentally
+     * satisfies the arithmetic "first + second == 10" used to detect spares. This
+     * must still be recognized as strike-then-non-strike, not a spare, though both
+     * paths happen to yield the same limit (10) here.
+     */
+    @Test
+    void maxPinsAfterStrikeThenGutterBallIsTen() {
+        BowlingGame game = new BowlingGame();
+        rollMany(game, 18, 0);
+        game.roll(10);
+        game.roll(0);
+        assertEquals(10, game.getMaxPinsForNextRoll());
+    }
+
+    @Test
+    void maxPinsIsTenOnTenthFrameRoll3AfterSpare() {
+        BowlingGame game = new BowlingGame();
+        rollMany(game, 18, 0);
+        game.roll(6);
+        game.roll(4); // spare
+        assertEquals(10, game.getMaxPinsForNextRoll());
+    }
+
+    /**
+     * A "reverse" spare (gutter ball then all remaining pins) still completes a
+     * spare and must grant a fresh rack for roll 3.
+     */
+    @Test
+    void maxPinsIsTenOnTenthFrameRoll3AfterGutterBallThenSpare() {
+        BowlingGame game = new BowlingGame();
+        rollMany(game, 18, 0);
+        game.roll(0);
+        game.roll(10); // 0 + 10 = spare
+        assertEquals(10, game.getMaxPinsForNextRoll());
+    }
+
+    @Test
+    void maxPinsIsZeroWhenGameIsOver() {
+        BowlingGame game = new BowlingGame();
+        rollMany(game, 12, 10); // perfect game
+        assertTrue(game.isGameOver());
+        assertEquals(0, game.getMaxPinsForNextRoll());
+    }
+
+    @Test
+    void maxPinsIsZeroWhenTenthFrameEndsWithoutStrikeOrSpare() {
+        BowlingGame game = new BowlingGame();
+        rollMany(game, 18, 0);
+        game.roll(3);
+        game.roll(4); // no strike/spare, game over after 2 rolls
+        assertTrue(game.isGameOver());
+        assertEquals(0, game.getMaxPinsForNextRoll());
+    }
+
+    @Test
+    void getStateReportsSameMaxPinsAsGetMaxPinsForNextRoll() {
+        BowlingGame game = new BowlingGame();
+        game.roll(7);
+        assertEquals(game.getMaxPinsForNextRoll(), game.getState().maxPinsForNextRoll());
+    }
+
+    // ========== maxPinsTenthFrame Internal Correctness ==========
+    // These exercise inputs the public API never actually produces
+    // (isGameOver() already returns 0 first), to prove the method is
+    // correct on its own terms rather than only by caller convention.
+
+    @Test
+    void maxPinsTenthFrameReturnsZeroWhenAllThreeRollsAlreadyMade() {
+        BowlingGame game = new BowlingGame();
+        assertEquals(0, game.maxPinsTenthFrame(List.of(10, 10, 10)));
+        assertEquals(0, game.maxPinsTenthFrame(List.of(4, 6, 8)));
+    }
+
+    @Test
+    void maxPinsTenthFrameReturnsZeroForAnAlreadyOpenCompletedFrame() {
+        BowlingGame game = new BowlingGame();
+        // No strike, no spare - this frame is already complete; no roll 3 is legal.
+        assertEquals(0, game.maxPinsTenthFrame(List.of(3, 4)));
+        assertEquals(0, game.maxPinsTenthFrame(List.of(0, 0)));
+    }
+
+    @Test
+    void maxPinsTenthFrameStillGrantsFreshPinsAfterASpareOrTwoStrikes() {
+        BowlingGame game = new BowlingGame();
+        assertEquals(10, game.maxPinsTenthFrame(List.of(6, 4)));
+        assertEquals(10, game.maxPinsTenthFrame(List.of(10, 10)));
+    }
+
+    @Test
+    void maxPinsTenthFrameStillLimitsRoll3AfterStrikeThenNonStrike() {
+        BowlingGame game = new BowlingGame();
+        assertEquals(7, game.maxPinsTenthFrame(List.of(10, 3)));
     }
 }

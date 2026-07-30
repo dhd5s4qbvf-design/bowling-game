@@ -8,7 +8,7 @@ Dieses Projekt demonstriert eine Full-Stack-Implementierung des klassischen Bowl
 
 - **Backend**: Spring Boot 3.3.2 (Java 17)
 - **Frontend**:
-`frontend_enhancements_angular21/` - **Angular 21 LTS**
+`frontend_angular21/` - **Angular 21 LTS**
 
 ---
 
@@ -102,6 +102,11 @@ mvn spring-boot:run
 - `POST /api/bowling/roll`  – Würfeln (Body: `{ "pins": 7 }`)
 - `POST /api/bowling/reset` – Neues Spiel starten
 
+Jede Antwort enthält neben `rolls`/`frames`/`totalScore`/`gameOver` auch
+`maxPinsForNextRoll` – die vom Backend berechnete Obergrenze für den nächsten
+Wurf. Das Frontend übernimmt diesen Wert 1:1, statt die Frame-Regeln
+clientseitig nachzubilden (siehe Abschnitt "Validierung" unten).
+
 **Tests ausführen:**
 ```bash
 cd backend
@@ -114,13 +119,22 @@ Deckt ab: Perfect Game (300), Gutter Game (0), Spare, Strike, 10. Frame Sonderre
 ### Frontend starten (Angular 21)
 
 ```bash
-cd frontend_enhancements_angular21
+cd frontend_angular21
 npm install
 npm start
 ```
 ✅ Läuft auf: **http://localhost:4201**
 
-> **Hinweis**: Das Frontend kommuniziert mit dem Backend auf `http://localhost:8080` (CORS ist konfiguriert)
+> **Hinweis zu CORS vs. Dev-Proxy**: Das Frontend ruft eine relative URL
+> (`/api/bowling/...`) auf. Im Dev-Server (`ng serve`) leitet
+> `proxy.conf.json` diese Requests server-seitig an `http://localhost:8080`
+> weiter – der Browser sieht dabei nur `http://localhost:4201`, es handelt
+> sich also aus Browsersicht um **same-origin**, CORS greift hier gar nicht.
+> Die CORS-Konfiguration im Backend (`CorsConfig.java`, erlaubt Origin
+> `4201`) wird trotzdem gebraucht: sobald der Browser das Backend direkt
+> anspricht – z.B. ein Production-Build ohne Reverse-Proxy vor dem Backend,
+> oder Tests/Tools, die den Dev-Proxy umgehen – ist das wieder ein
+> Cross-Origin-Request, und ohne CORS-Header würde der Browser ihn blocken.
 
 ---
 
@@ -137,9 +151,11 @@ npm start
   zurueckgegeben. Das Frontend zeigt dafuer noch keine Punktzahl an.
 - **10. Frame**: wird als Sonderfall behandelt (bis zu 3 Rolls, korrekte
   Regeln fuer Bonus-Wuerfe nach Spare/Strike).
-- **Validierung**: Sowohl serverseitig (harte Regel, z.B. "Summe zweier
-  Rolls > 10 Pins") als auch clientseitig (Buttons fuer unzulaessige
-  Pin-Zahlen werden deaktiviert, fuer bessere Usability).
+- **Validierung**: Serverseitig hart durchgesetzt (`BowlingGame.roll()`) und
+  zusaetzlich als `maxPinsForNextRoll` in jeder `GameState`-Antwort
+  exponiert. Das Frontend dedupliziert diese Regeln nicht clientseitig,
+  sondern deaktiviert Pin-Buttons rein anhand dieses backend-gelieferten
+  Werts – Backend bleibt einzige Quelle der Wahrheit fuer Frame-Regeln.
 - **Ein Spieler**: Wie in der Aufgabenstellung ausreichend – ein einziger
   In-Memory-`GameService` pro Backend-Instanz, kein Session-Handling.
 
@@ -215,28 +231,36 @@ ng new bowling-frontend-angular21 --standalone --routing=false
 cd bowling-frontend-angular21
 ```
 
-**2. Service Layer** (`bowling.service.ts`)
+**2. Service Layer** (`core/api/bowling.service.ts`)
 ```typescript
 @Injectable({ providedIn: 'root' })
 export class BowlingService {
-  private baseUrl = 'http://localhost:8080/api/bowling';
+  private readonly baseUrl = inject(API_BASE_URL); // relative '/api/bowling', see core/config/api.config.ts
 
   getState(): Observable<GameState> { ... }
   roll(pins: number): Observable<GameState> { ... }
   reset(): Observable<GameState> { ... }
 }
 ```
+Die Basis-URL ist relativ und wird ueber `proxy.conf.json` im Dev-Server auf
+`http://localhost:8080` umgeleitet, statt hart im Code zu stehen.
 
-**3. Component mit Signals** (`app.component.ts`)
+**3. State Store** (`bowling/services/bowling-store.service.ts`)
 ```typescript
-// Reactive state (Angular 21)
+// Reactive state, zentral statt im Component
 readonly state = signal<GameState | null>(null);
 readonly loading = signal(false);
+readonly errorMessage = signal<string | null>(null);
 
-// Computed signals für abgeleitete Werte
-readonly currentFrame = computed(() => { ... });
-readonly maxPinsForNextRoll = computed(() => { ... });
+load(): void { ... }
+roll(pins: number): void { ... }
+reset(): void { ... }
 ```
+`AppComponent` selbst ist nur noch eine duenne Huelle, die `BowlingStoreService`
+mit den praesentationalen Komponenten (`ScoreboardComponent`,
+`PinControlsComponent`, `RollHistoryComponent`) verdrahtet.
+`maxPinsForNextRoll` wird nicht mehr im Frontend berechnet – `PinControlsComponent`
+liest es direkt aus `state().maxPinsForNextRoll`, wie es vom Backend kommt.
 
 **4. Template** (`app.component.html`)
 ```html
@@ -278,8 +302,8 @@ bootstrapApplication(AppComponent, {
 - Verschiedene Kombinationen
 
 **3. Bug Fixes & Edge Cases**
-- `maxPinsForNextRoll` Logik nach Spare
-- 10. Frame Bonus-Würfe
+- `maxPinsForNextRoll`-Berechnung im Backend (`BowlingGame.getMaxPinsForNextRoll()`),
+  inklusive 10. Frame Sonderfaelle (Spare, Doppel-Strike)
 - Fehlerbehandlung bei ungültigen Eingaben
 
 **4. Dokumentation**
@@ -297,7 +321,7 @@ bootstrapApplication(AppComponent, {
 
 ✅ **Single Source of Truth**: Nur `List<Integer> rolls` wird gespeichert, Frames werden berechnet
 ✅ **Reactive State**: Angular Signals für automatische UI-Updates
-✅ **Validierung**: Sowohl Backend (Bean Validation) als auch Frontend (Button-Disabling)
+✅ **Validierung**: Backend als einzige Quelle der Wahrheit (Bean Validation + Frame-Regeln); Frontend deaktiviert Buttons nur anhand des von der API gelieferten `maxPinsForNextRoll`
 ✅ **CORS**: Explizite Konfiguration für lokale Entwicklung
 ✅ **Zoneless**: Angular 21 ohne Zone.js für bessere Performance
 ✅ **TypeScript**: Typsicherheit zwischen Frontend und Backend (DTOs)

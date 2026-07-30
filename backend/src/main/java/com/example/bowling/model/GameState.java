@@ -28,10 +28,12 @@ import java.util.List;
  *   <li>No setters (mutation impossible)</li>
  * </ul>
  *
- * @param rolls      immutable list of all rolls made in the game
- * @param frames     immutable list of calculated frame results
- * @param totalScore the sum of all completed frame scores
- * @param gameOver   whether the game has been completed
+ * @param rolls               immutable list of all rolls made in the game
+ * @param frames              immutable list of calculated frame results
+ * @param totalScore          the sum of all completed frame scores
+ * @param gameOver            whether the game has been completed
+ * @param maxPinsForNextRoll  the highest pin count the next roll may legally record;
+ *                            authoritative so clients don't need to re-implement frame rules
  * @author Bowling Game Kata
  * @version 2.0 - Converted to immutable record
  */
@@ -47,7 +49,10 @@ public record GameState(
     int totalScore,
 
     @Schema(description = "Whether the game has ended", example = "false")
-    boolean gameOver
+    boolean gameOver,
+
+    @Schema(description = "Maximum pins the next roll may legally record", example = "10", minimum = "0", maximum = "10")
+    int maxPinsForNextRoll
 ) {
     /**
      * Compact constructor with defensive copying to ensure immutability.
